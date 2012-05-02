@@ -1,0 +1,9 @@
+#!/bin/bash
+
+CXXFLAGS="-g -Wall -O3"
+LIBS_EIG="-I/usr/include/eigen3"
+LDLIBS_SHOGUN="-lshogun"
+ODE_PATH=/home/akihiko/prg/libode/ode-0.11.1
+LIBS_ODE="-I$ODE_PATH/include -DdDOUBLE"
+LDLIBS_ODE="-lm $ODE_PATH/ode/src/.libs/libode.a $ODE_PATH/drawstuff/src/.libs/libdrawstuff.a -lSM -lICE -lGL -L/usr/X11R6/lib -lXext -lX11 -ldl -lGLU -lpthread"
+

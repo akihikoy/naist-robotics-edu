@@ -1,0 +1,12 @@
+*~
+*.d
+*.o
+*.lo
+*.a
+*.so
+*.so.*
+*.out
+core
+core.[0-9]*
+
+bin/config.sh
