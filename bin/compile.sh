@@ -4,6 +4,7 @@ usage="usage: compile.sh [options] FILE [-- ADDITIONAL OPTIONS FOR g++]
     -eig         : using Eigen
     -sg          : using Shogun
     -ode         : using ODE
+    -nao         : using NAO
     -help        : show this"
 config_file=`dirname $0`/config.sh
 if [ ! -f $config_file ];then
@@ -22,6 +23,7 @@ while true; do
     -eig) LIBS="$LIBS $LIBS_EIG"; shift 1 ;;
     -sg)  LDLIBS="$LDLIBS $LDLIBS_SHOGUN"; shift 1 ;;
     -ode) LIBS="$LIBS $LIBS_ODE"; LDLIBS="$LDLIBS $LDLIBS_ODE"; shift 1 ;;
+    -nao) LIBS="$LIBS $LIBS_NAO"; LDLIBS="$LDLIBS $LDLIBS_NAO"; shift 1 ;;
     '') break ;;
     --) shift 1; break ;;
     *)

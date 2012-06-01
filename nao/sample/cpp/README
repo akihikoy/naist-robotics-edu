@@ -1,0 +1,9 @@
+* Usage
+
+Create naoconfig.h in order to define the IP address of NAO.
+See naoconfig.h.sample for example.
+
+Compile each program by using the script:
+ ../../../bin/compile.sh -nao XXX.cpp
+
+Launch the compiled program!

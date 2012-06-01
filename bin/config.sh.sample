@@ -1,9 +1,18 @@
 #!/bin/bash
 
 CXXFLAGS="-g -Wall -O3"
+CXXFLAGS+=" -Wstrict-aliasing=1"
+
 LIBS_EIG="-I/usr/include/eigen3"
+
 LDLIBS_SHOGUN="-lshogun"
+
 ODE_PATH=/home/akihiko/prg/libode/ode-0.11.1
 LIBS_ODE="-I$ODE_PATH/include -DdDOUBLE"
 LDLIBS_ODE="-lm $ODE_PATH/ode/src/.libs/libode.a $ODE_PATH/drawstuff/src/.libs/libdrawstuff.a -lSM -lICE -lGL -L/usr/X11R6/lib -lXext -lX11 -ldl -lGLU -lpthread"
 
+NAO_PATH=/home/akihiko/prg/aldebaran/naoqi-sdk-1.12-linux32
+LIBS_NAO="-I$NAO_PATH/include"
+NAO_PATHL=$NAO_PATH/lib
+LDLIBS_NAO="-L$NAO_PATHL -lboost_serialization-mt -lboost_thread-mt -lboost_program_options-mt -Wl,-rpath $NAO_PATHL"
+LDLIBS_NAO+=" -L$NAO_PATHL/naoqi -lalbase -Wl,-rpath $NAO_PATHL/naoqi"

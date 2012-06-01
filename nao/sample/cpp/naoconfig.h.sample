@@ -1,0 +1,6 @@
+#ifndef naoconfig_h
+#define naoconfig_h
+// const char ROBOT_IP=[]="163.221.139.150";
+static const char ROBOT_IP[]="192.168.1.10";
+static const int ROBOT_PORT=9559;
+#endif
