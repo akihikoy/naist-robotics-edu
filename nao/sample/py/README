@@ -1,0 +1,12 @@
+* Usage
+
+** Configuration
+
+Edit setup.bash or setup.tcsh in order to set python path.
+
+Edit naoconfig.py to set the NAO's IP address.
+
+** Execution
+
+Just run each script.
+

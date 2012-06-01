@@ -6,6 +6,7 @@
 *.so
 *.so.*
 *.out
+*.pyc
 core
 core.[0-9]*
 
