@@ -5,6 +5,7 @@ usage="usage: compile.sh [options] FILE [-- ADDITIONAL OPTIONS FOR g++]
     -sg          : using Shogun
     -ode         : using ODE
     -nao         : using NAO
+    -bio         : using Bioloid
     -help        : show this"
 config_file=`dirname $0`/config.sh
 if [ ! -f $config_file ];then
@@ -24,6 +25,13 @@ while true; do
     -sg)  LDLIBS="$LDLIBS $LDLIBS_SHOGUN"; shift 1 ;;
     -ode) LIBS="$LIBS $LIBS_ODE"; LDLIBS="$LDLIBS $LDLIBS_ODE"; shift 1 ;;
     -nao) LIBS="$LIBS $LIBS_NAO"; LDLIBS="$LDLIBS $LDLIBS_NAO"; shift 1 ;;
+    -bio) LIBS="$LIBS $LIBS_BIO"; LDLIBS="$LDLIBS $LDLIBS_BIO";
+      if ! [ -f $BIO_PATH/libbioloid.a ];then
+        echo "$BIO_PATH/libbioloid.a: library not found"
+        echo "type: cd $BIO_PATH; make"
+        exit 1
+      fi
+      shift 1 ;;
     '') break ;;
     --) shift 1; break ;;
     *)

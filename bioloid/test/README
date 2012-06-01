@@ -1,0 +1,10 @@
+* Usage
+
+Build library:
+  cd ../lib
+  make
+
+Compile bioloid-test.cpp by
+  ../../bin/compile.sh -bio bioloid-test.cpp
+
+Run ./bioloid-test.cpp ;
