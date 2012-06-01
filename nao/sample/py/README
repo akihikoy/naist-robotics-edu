@@ -2,9 +2,11 @@
 
 ** Configuration
 
-Edit setup.bash or setup.tcsh in order to set python path.
+Create setup.bash or setup.tcsh in order to set python path.
+See XXX.sample for example.
 
 Edit naoconfig.py to set the NAO's IP address.
+See naoconfig.py for example.
 
 ** Execution
 
