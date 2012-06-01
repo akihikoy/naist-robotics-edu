@@ -5,4 +5,11 @@ from naoconfig import *
 import sys,string
 
 proxyAudio = ALProxy("ALTextToSpeech",robot_IP,robot_port)
-proxyAudio.say(string.join(sys.argv[1:]))
+if len(sys.argv)>1:
+  proxyAudio.say(string.join(sys.argv[1:]))
+else:
+ while 1:
+  sys.stdout.write('>> ')
+  text= sys.stdin.readline().strip()
+  if text=='q':  break
+  proxyAudio.post.say(text)

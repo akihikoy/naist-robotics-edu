@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------------------------
 /*! \file    bioloid-test.cpp
-    \brief   certain c++ source file
-    \author  Akihiko Yamaguchi, akihiko-y@is.naist.jp / ay@akiyam.sakura.ne.jp
+    \brief   bioloid test program
+    \author  Akihiko Yamaguchi
     \version 0.1
     \date    Mar.08, 2010
 */

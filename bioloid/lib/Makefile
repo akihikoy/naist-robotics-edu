@@ -37,11 +37,11 @@ clean   :
 
 $(EXEC) : $(OBJS) $(LIBOBJS)
 	$(CXX) -o $@ $(OBJS) $(LDFLAGS) $(LIBOBJS) $(LDLIBS)
-	@(becho "$(EXEC) is generated")
+	@(echo "$(EXEC) is generated")
 
 $(ARC) : $(OBJS) $(LIBOBJS)
 	$(AR) r $(ARC) $(OBJS) $(LIBOBJS)
-	@(becho "$(ARC) is generated")
+	@(echo "$(ARC) is generated")
 
 %.o : %.cpp
 	$(CXX) -o $@ $(LIBS) $(CXXFLAGS) -c $<
