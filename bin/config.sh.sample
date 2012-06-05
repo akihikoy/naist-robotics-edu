@@ -18,7 +18,7 @@ NAO_PATH=/home/akihiko/prg/aldebaran/naoqi-sdk-1.12-linux32
 LIBS_NAO="-I$NAO_PATH/include"
 NAO_PATHL=$NAO_PATH/lib
 LDLIBS_NAO="-L$NAO_PATHL -lboost_serialization-mt -lboost_thread-mt -lboost_program_options-mt -Wl,-rpath $NAO_PATHL"
-LDLIBS_NAO+=" -L$NAO_PATHL/naoqi -lalbase -lalcommon -Wl,-rpath $NAO_PATHL/naoqi"
+LDLIBS_NAO+=" -L$NAO_PATHL/naoqi -lalbase -lalcommon -lalvalue -Wl,-rpath $NAO_PATHL/naoqi"
 
 BIO_PATH=`dirname $0`/../bioloid/lib
 LIBS_BIO="-I$BIO_PATH"
