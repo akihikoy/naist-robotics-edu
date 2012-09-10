@@ -1,4 +1,4 @@
-#include "../lib/arm.h"
+#include "simpleode/lib/arm.h"
 #include <iostream>
 using namespace std;
 
@@ -51,7 +51,7 @@ void test_keyevent(xode::TEnvironment &env, xode::TDynRobot &robot, int command)
 int main (int argc, char **argv)
 {
   xode::TEnvironment env;
-  dsFunctions fn= xode::SimInit("../textures",env);
+  dsFunctions fn= xode::SimInit("textures",env);
   // dsFunctions fn= xode::SimInit("/home/akihiko/proj/skyai/benchmarks/humanoid01/m/textures_w",env);
   xode::ControlCallback= &test_ctrl;
   xode::DrawCallback= &test_draw;

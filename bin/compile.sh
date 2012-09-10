@@ -8,6 +8,7 @@ usage="usage: compile.sh [options] FILE [-- ADDITIONAL OPTIONS FOR g++]
     -nao         : using NAO
     -bio         : using Bioloid
     -help        : show this"
+base_dir=`dirname $0`/..
 config_file=`dirname $0`/config.sh
 if [ ! -f $config_file ];then
   echo "$config_file not found."
@@ -17,7 +18,7 @@ fi
 source $config_file
 
 TARGET=
-LIBS=
+LIBS=-I$base_dir
 LDLIBS=
 while true; do
   case "$1" in

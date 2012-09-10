@@ -16,6 +16,7 @@
 #endif
 
 #include <vector>
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <iostream>
@@ -86,20 +87,29 @@ public:
   ~TDynRobot() {}
 
   std::vector<TNCBody>& Body() {return body_;}
+  const std::vector<TNCBody>& Body() const {return body_;}
+
   dBody& Body(int j) {return body_[j];}
+  const dBody& Body(int j) const {return body_[j];}
 
   void Clear();
 
+  void Setup(dWorldID world, dSpaceID space)
+    {
+      Create(world,space);
+      body_contact_.resize(body_.size());
+      std::fill(body_contact_.begin(),body_contact_.end(),false);
+    }
   void Create(dWorldID world, dSpaceID space);
-  void Draw();
+  void Draw() const;
 
-  const dReal GetAngleHinge(int j)  {return joint_h_[j].getAngle();}
-  const dReal GetAngVelHinge(int j)  {return joint_h_[j].getAngleRate();}
+  const dReal GetAngleHinge(int j) const {return joint_h_[j].getAngle();}
+  const dReal GetAngVelHinge(int j) const {return joint_h_[j].getAngleRate();}
 
-  const dReal GetAngleUniversal1(int j)  {return joint_u_[j].getAngle1();}
-  const dReal GetAngVelUniversal1(int j)  {return joint_u_[j].getAngle1Rate();}
-  const dReal GetAngleUniversal2(int j)  {return joint_u_[j].getAngle2();}
-  const dReal GetAngVelUniversal2(int j)  {return joint_u_[j].getAngle2Rate();}
+  const dReal GetAngleUniversal1(int j) const {return joint_u_[j].getAngle1();}
+  const dReal GetAngVelUniversal1(int j) const {return joint_u_[j].getAngle1Rate();}
+  const dReal GetAngleUniversal2(int j) const {return joint_u_[j].getAngle2();}
+  const dReal GetAngVelUniversal2(int j) const {return joint_u_[j].getAngle2Rate();}
 
   void SetAngVelHinge(int j, const dReal &vel)  {joint_h_[j].setParam(dParamVel,vel);}
   void AddTorqueHinge(int j, const dReal &u)  {joint_h_[j].addTorque(u);}
@@ -108,8 +118,19 @@ public:
   void SetAngVelUniversal2(int j, const dReal &vel)  {joint_u_[j].setParam(dParamVel2,vel);}
   void AddTorquesUniversal(int j, const dReal &u1, const dReal &u2)  {joint_u_[j].addTorques(u1,u2);}
 
-  const dReal* GetHandPos();
-  const dReal* GetHandRot();
+  //! return true if body_[j] contacts with the other objects
+  bool GetBodyContact(int j) const {return body_contact_[j];}
+
+  void ClearContactInfo()  {std::fill(body_contact_.begin(),body_contact_.end(),false);}
+  void AddToContactInfo(dBodyID b)
+    {
+      int j(0);
+      for(std::vector<TNCBody>::const_iterator itr(body_.begin()),last(body_.end());itr!=last;++itr,++j)
+        if(itr->id()==b)  {body_contact_[j]= true;  break;}
+    }
+
+  const dReal* GetHandPos() const;
+  const dReal* GetHandRot() const;
 
 private:
   std::vector<TNCBody> body_;
@@ -121,6 +142,8 @@ private:
   std::vector<TNCHinge2Joint> joint_h2_;
   std::vector<TNCUniversalJoint> joint_u_;
   std::vector<TNCFixedJoint> joint_f_;
+
+  std::vector<bool> body_contact_;
 };
 
 void TDynRobot::Clear()
@@ -135,9 +158,11 @@ void TDynRobot::Clear()
   joint_h2_.clear();
   joint_u_.clear();
   joint_f_.clear();
+
+  body_contact_.clear();
 }
 
-void TDynRobot::Draw()
+void TDynRobot::Draw() const
 {
   dsSetTexture (DS_WOOD);
 
@@ -197,9 +222,11 @@ public:
 
   dWorldID WorldID() {return world_.id();}
   dSpaceID SpaceID() {return space_.id();}
+  dGeomID PlaneID() {return plane_.id();}
   dJointGroupID ContactGroupID() {return contactgroup_.id();}
 
   TDynRobot& Robot() {return robot_;}
+  const TDynRobot& Robot() const {return robot_;}
 
   const double& Time() const {return time_;}
 
@@ -207,6 +234,7 @@ public:
   void TimeStep(const double &ts)  {time_step_=ts;}
 
   void Create();
+  void Reset()  {Create();}
   void StepSim();
   void Draw();
   void KeyEvent(int command);
@@ -229,7 +257,7 @@ void TEnvironment::Create()
   dWorldSetCFM (world_.id(),1e-5);
   plane_.create (space_,0,0,1,0);
 
-  robot_.Create(world_.id(),space_.id());
+  robot_.Setup(world_.id(),space_.id());
 
   time_= 0.0;
 }
@@ -238,6 +266,7 @@ void TEnvironment::StepSim()
 {
   if(ControlCallback)  ControlCallback(*this,robot_);
 
+  robot_.ClearContactInfo();
   space_.collide (0,&NearCallback);
   world_.step (time_step_);
   time_+= time_step_;
@@ -282,6 +311,8 @@ void NearCallback(void *data, dGeomID o1, dGeomID o2)
       dJointID c= dJointCreateContact(Env->WorldID(),Env->ContactGroupID(),contact+i);
       dJointAttach (c,b1,b2);
     }
+    if (o1!=Env->PlaneID()) Env->Robot().AddToContactInfo(b1);
+    if (o2!=Env->PlaneID()) Env->Robot().AddToContactInfo(b2);
   }
 }
 

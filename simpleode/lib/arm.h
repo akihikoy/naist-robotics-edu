@@ -134,11 +134,11 @@ void TDynRobot::Create(dWorldID world, dSpaceID space)
   }
 }
 
-const dReal* TDynRobot::GetHandPos()
+const dReal* TDynRobot::GetHandPos() const
 {
   return link_b_.back().getPosition();
 }
-const dReal* TDynRobot::GetHandRot()
+const dReal* TDynRobot::GetHandRot() const
 {
   return link_b_.back().getRotation();
 }
