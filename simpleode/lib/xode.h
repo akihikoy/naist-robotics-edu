@@ -218,7 +218,15 @@ class TEnvironment
 {
 public:
   TEnvironment()
-    : space_(0), time_(0.0), time_step_(0.05) {}
+      : space_(0), time_(0.0), time_step_(0.05)
+    {
+      surface_params_.mode = dContactBounce | dContactSoftCFM;
+      surface_params_.mu = dInfinity;
+      surface_params_.mu2 = 0;
+      surface_params_.bounce = 0.1;
+      surface_params_.bounce_vel = 0.1;
+      surface_params_.soft_cfm = 0.01;
+    }
 
   dWorldID WorldID() {return world_.id();}
   dSpaceID SpaceID() {return space_.id();}
@@ -227,6 +235,9 @@ public:
 
   TDynRobot& Robot() {return robot_;}
   const TDynRobot& Robot() const {return robot_;}
+
+  dSurfaceParameters& SurfaceParams()  {return surface_params_;}
+  const dSurfaceParameters& SurfaceParams() const {return surface_params_;}
 
   const double& Time() const {return time_;}
 
@@ -246,6 +257,8 @@ private:
 
   TDynRobot robot_;
   dPlane    plane_;
+
+  dSurfaceParameters surface_params_;
 
   double time_,time_step_;
 };
@@ -297,12 +310,7 @@ void NearCallback(void *data, dGeomID o1, dGeomID o2)
   dContact contact[MAX_CONTACTS];   // up to MAX_CONTACTS contacts per link
   for (int i=0; i<MAX_CONTACTS; i++)
   {
-    contact[i].surface.mode = dContactBounce | dContactSoftCFM;
-    contact[i].surface.mu = dInfinity;
-    contact[i].surface.mu2 = 0;
-    contact[i].surface.bounce = 0.1;
-    contact[i].surface.bounce_vel = 0.1;
-    contact[i].surface.soft_cfm = 0.01;
+    contact[i].surface= Env->SurfaceParams();
   }
   if (int numc=dCollide (o1,o2,MAX_CONTACTS,&contact[0].geom,sizeof(dContact)))
   {
