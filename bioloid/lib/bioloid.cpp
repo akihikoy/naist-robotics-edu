@@ -7,6 +7,11 @@
 */
 //-------------------------------------------------------------------------------------------
 #include <bioloid.h>
+#include <linux/serial.h>
+#include <cstdio>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
 //-------------------------------------------------------------------------------------------
 namespace loco_rabbits
 {
@@ -17,12 +22,33 @@ using namespace std;
 using namespace serial;
 
 
+static inline unsigned char* V2UC(void *p)
+{
+  return static_cast<unsigned char*>(p);
+}
+static inline const unsigned char* V2UC(const void *p)
+{
+  return static_cast<const unsigned char*>(p);
+}
+//-------------------------------------------------------------------------------------------
+
+//! Get clock in [ms]
+static inline long GetClock()
+{
+  struct timeval tv;
+  gettimeofday (&tv, NULL);
+  return (tv.tv_sec * 1000 + tv.tv_usec / 1000);
+}
+//-------------------------------------------------------------------------------------------
+
+#ifndef BIOLOID_SERIAL
 static unsigned char GetChecksum (unsigned char *beginitr, unsigned char *enditr)
 {
   int sum(0);
   for(; beginitr!=enditr; ++beginitr)  sum+= *beginitr;
   return 255 - (sum % 256);
 }
+#endif
 //-------------------------------------------------------------------------------------------
 
 termios GetDefaultTermios (void)
@@ -38,17 +64,254 @@ termios GetDefaultTermios (void)
 }
 //-------------------------------------------------------------------------------------------
 
+//===========================================================================================
+// class TBioloidSerial : public serial::TSerialCom
+//===========================================================================================
+/*override*/bool TBioloidSerial::Open(void)
+{
+  struct termios newtio;
+  struct serial_struct serinfo;
+
+  memset(&newtio, 0, sizeof(newtio));
+  Close();
+
+  if((fd = open(s_tty.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK)) < 0)
+  {
+    LERROR("Device open error: "<<s_tty.c_str());
+    Close();
+    return false;
+  }
+
+  newtio.c_cflag    = B38400|CS8|CLOCAL|CREAD;
+  newtio.c_iflag    = IGNPAR;
+  newtio.c_oflag    = 0;
+  newtio.c_lflag    = 0;
+  newtio.c_cc[VTIME]  = 0;
+  newtio.c_cc[VMIN]  = 0;
+
+  tcflush(fd, TCIFLUSH);
+  tcsetattr(fd, TCSANOW, &newtio);
+
+  if(fd == -1)
+    return false;
+
+  if(ioctl(fd, TIOCGSERIAL, &serinfo) < 0)
+  {
+    LERROR("Cannot get serial info");
+    return false;
+  }
+
+  serinfo.flags &= ~ASYNC_SPD_MASK;
+  serinfo.flags |= ASYNC_SPD_CUST;
+  serinfo.custom_divisor = serinfo.baud_base / baudrate;
+
+  if(ioctl(fd, TIOCSSERIAL, &serinfo) < 0)
+  {
+    LERROR("Cannot set serial info");
+    return false;
+  }
+
+  Close();
+
+  byte_trans_time= (float)((1000.0f / baudrate) * 12.0f);
+LDBGVAR(byte_trans_time);
+
+  memset(&newtio, 0, sizeof(newtio));
+  Close();
+
+  if((fd = open(s_tty.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK)) < 0)
+  {
+    LERROR("device open error: "<<s_tty.c_str());
+    Close();
+    return false;
+  }
+
+  newtio.c_cflag    = B38400|CS8|CLOCAL|CREAD;
+  newtio.c_iflag    = IGNPAR;
+  newtio.c_oflag    = 0;
+  newtio.c_lflag    = 0;
+  newtio.c_cc[VTIME]  = 0;
+  newtio.c_cc[VMIN]  = 0;
+
+  tcflush(fd, TCIFLUSH);
+  tcsetattr(fd, TCSANOW, &newtio);
+
+  status= COMM_RXSUCCESS;
+
+  SetTimeout(6);
+
+  return true;
+}
+//-------------------------------------------------------------------------------------------
+
+/*override*/int TBioloidSerial::Write(const void *buff, size_t size)
+{
+  if(status == COMM_RXTIMEOUT || status == COMM_RXCORRUPT)
+    Clear();
+/*dbg*/while(!CheckTimeout())
+/*dbg*/{Clear();}
+
+  int num= TSerialCom::Write(buff, size);
+
+  if((int)size != num)
+  {
+    status = COMM_TXFAIL;
+    return num;
+  }
+
+  if(V2UC(buff)[4]==0x02)  // buff[4]:instruction == read(0x02)
+    SetTimeout(V2UC(buff)[6] + 6);  // buff[6]:length of data to be read
+  else
+    SetTimeout(6);
+
+  status= COMM_TXSUCCESS;
+
+  if(V2UC(buff)[2] == 0xfe)  // buff[2]:id == broadcast-id(0xfe)
+    status= COMM_RXSUCCESS;
+
+  return num;
+}
+//-------------------------------------------------------------------------------------------
+
+int TBioloidSerial::low_read(void *buff)
+{
+  unsigned char i, j, num;
+
+  if(status == COMM_TXSUCCESS)
+  {
+    read_base= 0;
+    read_size= 6;
+  }
+
+  num= TSerialCom::Read(V2UC(buff)+read_base, read_size-read_base);
+  read_base+= num;
+  if(read_base < read_size)
+  {
+    if(CheckTimeout())
+    {
+      if(read_base == 0)
+        status= COMM_RXTIMEOUT;
+      else
+        status= COMM_RXCORRUPT;
+      return read_base;
+    }
+  }
+
+  // find a correct packet header
+  for(i=0; i<(read_base-1); i++)
+  {
+    if(V2UC(buff)[i] == 0xff && V2UC(buff)[i+1] == 0xff)
+      break;
+    else if(i == read_base-2 && V2UC(buff)[read_base-1] == 0xff)
+      break;
+  }
+  if(i > 0)
+  {
+    for(j=0; j<(read_base-i); ++j)
+      V2UC(buff)[j] = V2UC(buff)[j + i];
+
+    read_base-= i;
+  }
+
+  if(read_base < read_size)
+  {
+    status= COMM_RXWAITING;
+    return read_base;
+  }
+
+  read_size= V2UC(buff)[3] + 4;  // buff[3]:length
+  if(read_base < read_size)
+  {
+    num = TSerialCom::Read(V2UC(buff)+read_base, read_size-read_base);
+    read_base+= num;
+    if(read_base < read_size)
+    {
+      status= COMM_RXWAITING;
+      return read_base;
+    }
+  }
+
+  // checksum
+  unsigned char checksum= 0;
+  for(i=0; i<(V2UC(buff)[3]+1); ++i)  // buff[3]:length
+    checksum+= V2UC(buff)[i+2];
+  checksum= ~checksum;
+
+  if(V2UC(buff)[V2UC(buff)[3]+3] != checksum)  // buff[3]:length
+  {
+    status= COMM_RXCORRUPT;
+    return read_base;
+  }
+
+  status= COMM_RXSUCCESS;
+  return read_base;
+}
+//-------------------------------------------------------------------------------------------
+
+//! size is never used
+/*override*/int TBioloidSerial::Read(void *buff, size_t size)
+{
+  if(status != COMM_TXSUCCESS)
+    return -1;
+
+  int num(0);
+  do
+  {
+    num= low_read(buff);
+//*dbg*/LWARNING(status);
+  } while(status==COMM_RXWAITING);
+  return num;
+}
+//-------------------------------------------------------------------------------------------
+
+//! rcv_size: receive size in byte
+/*virtual*/void TBioloidSerial::SetTimeout(size_t rcv_size)
+{
+  start_time= GetClock();
+  rcv_wait_time= (float)(byte_trans_time*(float)rcv_size + 5.0f);
+LDBGVAR(byte_trans_time);
+LDBGVAR(rcv_size);
+LDBGVAR(rcv_wait_time);
+}
+//-------------------------------------------------------------------------------------------
+
+/*virtual*/bool TBioloidSerial::CheckTimeout(void)
+{
+  long time;
+
+  time= GetClock() - start_time;
+
+  if(time > rcv_wait_time)
+    return true;
+  else if(time < 0)
+    start_time= GetClock();
+
+  return false;
+}
+//-------------------------------------------------------------------------------------------
+
+
 
 //===========================================================================================
 // class TBioloidController
 //===========================================================================================
 
+#ifndef BIOLOID_SERIAL
 void TBioloidController::Connect (const std::string &v_tty, const termios &v_ios)
 {
   if (serial_.IsOpen())  serial_.Close();
   serial_.setting(v_tty,v_ios);
   serial_.Open();
 }
+#else
+//-------------------------------------------------------------------------------------------
+void TBioloidController::Connect (const std::string &v_tty, int baudnum)
+{
+  if (serial_.IsOpen())  serial_.Close();
+  serial_.setting(v_tty,baudnum);
+  serial_.Open();
+}
+#endif
 //-------------------------------------------------------------------------------------------
 
 void TBioloidController::Disconnect ()
@@ -75,6 +338,7 @@ int TBioloidController::ReadFromFFFF (unsigned char *buf, int N, int max_trial, 
 }
 //-------------------------------------------------------------------------------------------
 
+#ifndef BIOLOID_SERIAL
 //!\brief read a valid status packet from dynamixels
 int TBioloidController::ReadStatusPacket (unsigned char id)
 {
@@ -101,6 +365,14 @@ int TBioloidController::ReadStatusPacket (unsigned char id)
   }
   return N;
 }
+//-------------------------------------------------------------------------------------------
+#else // BIOLOID_SERIAL
+//!\brief read a valid status packet from dynamixels
+int TBioloidController::ReadStatusPacket (unsigned char id)
+{
+  return serial_.Read(buffer_);
+}
+#endif
 //-------------------------------------------------------------------------------------------
 
 void TBioloidController::ReadAndEcho (int N)
@@ -139,6 +411,37 @@ void TBioloidController::TossTest (void)
     sync_writes_<<2<<1;
     sync_writes_>>serial_;
     usleep(100000);
+  }
+}
+//-------------------------------------------------------------------------------------------
+
+int TBioloidController::Ping (unsigned char id)
+{
+  biol_writes_.Init(id);
+  biol_writes_<<0x01;
+  biol_writes_>>serial_;
+
+  int N= ReadStatusPacket(id);
+  if (N>0)
+  {
+    std::cerr<<"Ping("<<(int)id<<"): read "<<N<<" bytes: "<<PrintBuffer(buffer_,N)<<std::endl;
+    return buffer_[4];
+  }
+  return -1;
+}
+//-------------------------------------------------------------------------------------------
+
+//! state:0:off, 1:on
+void TBioloidController::LED (unsigned char id, unsigned int state)
+{
+  biol_writes_.Init(id);
+  biol_writes_<<0x03<<0x19<<state;
+  biol_writes_>>serial_;
+
+  int N= ReadStatusPacket(id);
+  if (N>0)
+  {
+    std::cerr<<"LED("<<(int)id<<"): read "<<N<<" bytes: "<<PrintBuffer(buffer_,N)<<std::endl;
   }
 }
 //-------------------------------------------------------------------------------------------

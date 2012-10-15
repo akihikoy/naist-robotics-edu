@@ -41,6 +41,7 @@ public:
   virtual int Read(void *buff, size_t size) = 0;
   virtual int PersistingRead(unsigned char *buff, size_t size, int max_trial=10);
   virtual bool IsOpen(void) const = 0;
+  virtual void Clear() {}
 };
 //-------------------------------------------------------------------------------------------
 
@@ -49,7 +50,7 @@ public:
 class TSerialCom : public TComBase
 //===========================================================================================
 {
-private:
+protected:
   int fd;
   std::string s_tty;
   struct termios s_ios;
@@ -70,6 +71,8 @@ public:
   override int Write(const void *buff, size_t size);
   override int Read(void *buff, size_t size);
   override bool IsOpen(void) const {return (fd>=0);};
+  override void Clear();
+
 };
 //-------------------------------------------------------------------------------------------
 
