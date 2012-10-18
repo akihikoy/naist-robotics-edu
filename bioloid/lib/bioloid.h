@@ -153,11 +153,14 @@ public:
   virtual void SetTimeout(size_t rcv_size);
   virtual bool CheckTimeout(void);
 
+  TStatus GetStatus() const {return status;}
+
 protected:
 
   TStatus status;
   float baudrate;
-  float byte_trans_time, start_time, rcv_wait_time;
+  long  start_time;
+  float byte_trans_time, rcv_wait_time;
 
   int read_size, read_base;
 
@@ -259,11 +262,8 @@ int TBioloidController::GetAllAngles (t_id_fwditr id_begin, t_id_fwditr id_end, 
   int err(0);
   double angle;
   for (; id_begin!=id_end; ++id_begin,++angle_begin)
-#ifndef BIOLOID_SERIAL
     if (PersistingGetAngle(*id_begin,angle)>0)
-#else
-    if (GetAngle(*id_begin,angle)>0)
-#endif
+    // if (GetAngle(*id_begin,angle)>0)
       *angle_begin= angle;
     else
       ++err;

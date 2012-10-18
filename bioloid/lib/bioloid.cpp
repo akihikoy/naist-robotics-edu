@@ -148,8 +148,8 @@ LDBGVAR(byte_trans_time);
 {
   if(status == COMM_RXTIMEOUT || status == COMM_RXCORRUPT)
     Clear();
-/*dbg*/while(!CheckTimeout())
-/*dbg*/{Clear();}
+//*dbg*/while(!CheckTimeout())
+//*dbg*/{/*usleep(100);*/}
 
   int num= TSerialCom::Write(buff, size);
 
@@ -269,9 +269,9 @@ int TBioloidSerial::low_read(void *buff)
 {
   start_time= GetClock();
   rcv_wait_time= (float)(byte_trans_time*(float)rcv_size + 5.0f);
-LDBGVAR(byte_trans_time);
-LDBGVAR(rcv_size);
-LDBGVAR(rcv_wait_time);
+// LDBGVAR(byte_trans_time);
+// LDBGVAR(rcv_size);
+// LDBGVAR(rcv_wait_time);
 }
 //-------------------------------------------------------------------------------------------
 
@@ -491,6 +491,13 @@ int TBioloidController::GetAngle (unsigned char id, double &angle)
   std::cerr<<"GetAngle: err= "<<(double)ERR/(double)TOTAL*100.0<<"%"<<std::endl;
   #endif
   angle= CommandToDegree<double>(buffer_[5],buffer_[6]);
+#ifdef BIOLOID_SERIAL
+  if(serial_.GetStatus()!=TBioloidSerial::COMM_RXSUCCESS)  return 0;
+#endif
+//*dbg*/if(angle>50) std::cerr<<"read "<<N<<" bytes: "<<PrintBuffer(buffer_,N)<<std::endl;
+//*dbg*/if(angle>50) LDBGVAR(serial_.GetStatus());
+//*dbg*/if(angle>50) LDBGVAR(angle);
+//*dbg*/if(angle>50) exit(1);
   return N;
 }
 //-------------------------------------------------------------------------------------------
