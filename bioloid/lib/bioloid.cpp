@@ -41,14 +41,12 @@ static inline long GetClock()
 }
 //-------------------------------------------------------------------------------------------
 
-#ifndef BIOLOID_SERIAL
 static unsigned char GetChecksum (unsigned char *beginitr, unsigned char *enditr)
 {
   int sum(0);
   for(; beginitr!=enditr; ++beginitr)  sum+= *beginitr;
   return 255 - (sum % 256);
 }
-#endif
 //-------------------------------------------------------------------------------------------
 
 termios GetDefaultTermios (void)
@@ -114,7 +112,7 @@ termios GetDefaultTermios (void)
   Close();
 
   byte_trans_time= (float)((1000.0f / baudrate) * 12.0f);
-LDBGVAR(byte_trans_time);
+// LDBGVAR(byte_trans_time);
 
   memset(&newtio, 0, sizeof(newtio));
   Close();
@@ -296,37 +294,43 @@ int TBioloidSerial::low_read(void *buff)
 // class TBioloidController
 //===========================================================================================
 
-#ifndef BIOLOID_SERIAL
+//! using TSerialCom for serial communication (CM-5,(CM-500))
 void TBioloidController::Connect (const std::string &v_tty, const termios &v_ios)
 {
-  if (serial_.IsOpen())  serial_.Close();
-  serial_.setting(v_tty,v_ios);
-  serial_.Open();
+  if (serial_std_.IsOpen())  serial_std_.Close();
+  serial_std_.setting(v_tty,v_ios);
+  serial_std_.Open();
+  serial_type_= sctStandard;
+  serial_= &serial_std_;
 }
-#else
 //-------------------------------------------------------------------------------------------
-void TBioloidController::Connect (const std::string &v_tty, int baudnum)
+//! using TBioloidSerial for serial communication (USB2Dynamixel)
+void TBioloidController::ConnectBS (const std::string &v_tty, int baudnum)
 {
-  if (serial_.IsOpen())  serial_.Close();
-  serial_.setting(v_tty,baudnum);
-  serial_.Open();
+  if (serial_bio_.IsOpen())  serial_bio_.Close();
+  serial_bio_.setting(v_tty,baudnum);
+  serial_bio_.Open();
+  serial_type_= sctBioloid;
+  serial_= &serial_bio_;
 }
-#endif
 //-------------------------------------------------------------------------------------------
 
 void TBioloidController::Disconnect ()
 {
-  if (serial_.IsOpen())  serial_.Close();
+  if (serial_!=NULL && serial_->IsOpen())  serial_->Close();
+  serial_= NULL;
+  serial_type_= sctNone;
 }
 //-------------------------------------------------------------------------------------------
 
 //!\brief read from where the data starts with 0xffff
 int TBioloidController::ReadFromFFFF (unsigned char *buf, int N, int max_trial, const int pr_max_trial)
 {
+  LASSERT(serial_!=NULL);
   int dn,offset(N);
   for(;max_trial>0;--max_trial)
   {
-    dn= serial_.PersistingRead (buf+N-offset, offset, pr_max_trial);
+    dn= serial_->PersistingRead (buf+N-offset, offset, pr_max_trial);
     if(dn!=offset)  return N-offset+dn;
     for(offset=0;offset<N-1;++offset)
       if(buf[offset]==0xff && buf[offset+1]==0xff)  break;
@@ -338,47 +342,52 @@ int TBioloidController::ReadFromFFFF (unsigned char *buf, int N, int max_trial, 
 }
 //-------------------------------------------------------------------------------------------
 
-#ifndef BIOLOID_SERIAL
 //!\brief read a valid status packet from dynamixels
 int TBioloidController::ReadStatusPacket (unsigned char id)
 {
-  // int N= serial_.Read (buffer_, 4);
-  // int N= serial_.PersistingRead (buffer_, 4);
-  int N= ReadFromFFFF (buffer_, 4);
-  if (N!=4 || buffer_[0]!=0xff || buffer_[1]!=0xff || buffer_[2]!=id)
+  if(serial_type_==sctStandard)
   {
-    int Nr= serial_.Read(buffer_+N, SIZE_OF_ARRAY(buffer_)-N);
-    LERROR("in reading a status packet from dynamixels: "<<PrintBuffer(buffer_,N)<<";"<<PrintBuffer(buffer_+N,Nr));
-    LDBGVAR(N);
-    LDBGVAR((int)id);
-    return -1;
+    // int N= serial_std_.Read (buffer_, 4);
+    // int N= serial_std_.PersistingRead (buffer_, 4);
+    int N= ReadFromFFFF (buffer_, 4);
+    if (N!=4 || buffer_[0]!=0xff || buffer_[1]!=0xff || buffer_[2]!=id)
+    {
+      int Nr= serial_std_.Read(buffer_+N, SIZE_OF_ARRAY(buffer_)-N);
+      LERROR("in reading a status packet from dynamixels: "<<PrintBuffer(buffer_,N)<<";"<<PrintBuffer(buffer_+N,Nr));
+      LDBGVAR(N);
+      LDBGVAR((int)id);
+      return -1;
+    }
+    // N= serial_std_.Read (buffer_+4, buffer_[3])+4;
+    N= serial_std_.PersistingRead (buffer_+4, buffer_[3])+4;
+    if (N!=buffer_[3]+4 || buffer_[4]!=0 || GetChecksum(buffer_+2,buffer_+N-1)!=buffer_[N-1])
+    {
+      LERROR("in reading a status packet from dynamixels: "<<PrintBuffer(buffer_,N));
+      // LASSERT1op1(N,==,buffer_[3]+4);
+      // LASSERT1op1(buffer_[4],==,0);
+      // LASSERT1op1(GetChecksum(buffer_+2,buffer_+N-1),==,buffer_[N-1]);
+      return -1;
+    }
+    return N;
   }
-  // N= serial_.Read (buffer_+4, buffer_[3])+4;
-  N= serial_.PersistingRead (buffer_+4, buffer_[3])+4;
-  if (N!=buffer_[3]+4 || buffer_[4]!=0 || GetChecksum(buffer_+2,buffer_+N-1)!=buffer_[N-1])
+  else if (serial_type_==sctBioloid)
   {
-    LERROR("in reading a status packet from dynamixels: "<<PrintBuffer(buffer_,N));
-    // LASSERT1op1(N,==,buffer_[3]+4);
-    // LASSERT1op1(buffer_[4],==,0);
-    // LASSERT1op1(GetChecksum(buffer_+2,buffer_+N-1),==,buffer_[N-1]);
-    return -1;
+    return serial_bio_.Read(buffer_);
   }
-  return N;
+  else
+  {
+    LERROR("serial communication is not configured!");
+    lexit(df);
+  }
+  return 0;
 }
-//-------------------------------------------------------------------------------------------
-#else // BIOLOID_SERIAL
-//!\brief read a valid status packet from dynamixels
-int TBioloidController::ReadStatusPacket (unsigned char id)
-{
-  return serial_.Read(buffer_);
-}
-#endif
 //-------------------------------------------------------------------------------------------
 
 void TBioloidController::ReadAndEcho (int N)
 {
+  LASSERT(serial_!=NULL);
   // memset(buffer_,0,sizeof(buffer_));
-  N= serial_.Read (buffer_, N);
+  N= serial_->Read (buffer_, N);
   const char *rbufptr(reinterpret_cast<const char*>(buffer_));
   for (int i(0);i<N;++i,++rbufptr)
     std::cerr<<*rbufptr;
@@ -390,8 +399,9 @@ void TBioloidController::ReadAndEcho (int N)
 //!\brief binary communicating mode
 void TBioloidController::TossMode(void)
 {
+  LASSERT(serial_!=NULL);
   str_writes_<<"t\n";
-  str_writes_>>serial_;
+  str_writes_>>*serial_;
   /*dbg*/ReadAndEcho();
 }
 //-------------------------------------------------------------------------------------------
@@ -399,17 +409,18 @@ void TBioloidController::TossMode(void)
 //! LED of (#1,#2) changes (on,off),(off,on),(on,off),(off,on),...
 void TBioloidController::TossTest (void)
 {
+  LASSERT(serial_!=NULL);
   for (int i(0);i<20;++i)
   {
     sync_writes_.Init (0x19, 1);
     sync_writes_<<1<<1;
     sync_writes_<<2<<0;
-    sync_writes_>>serial_;
+    sync_writes_>>*serial_;
     usleep(100000);
     sync_writes_.Init (0x19, 1);
     sync_writes_<<1<<0;
     sync_writes_<<2<<1;
-    sync_writes_>>serial_;
+    sync_writes_>>*serial_;
     usleep(100000);
   }
 }
@@ -417,9 +428,10 @@ void TBioloidController::TossTest (void)
 
 int TBioloidController::Ping (unsigned char id)
 {
+  LASSERT(serial_!=NULL);
   biol_writes_.Init(id);
   biol_writes_<<0x01;
-  biol_writes_>>serial_;
+  biol_writes_>>*serial_;
 
   int N= ReadStatusPacket(id);
   if (N>0)
@@ -434,9 +446,10 @@ int TBioloidController::Ping (unsigned char id)
 //! state:0:off, 1:on
 void TBioloidController::LED (unsigned char id, unsigned int state)
 {
+  LASSERT(serial_!=NULL);
   biol_writes_.Init(id);
   biol_writes_<<0x03<<0x19<<state;
-  biol_writes_>>serial_;
+  biol_writes_>>*serial_;
 
   int N= ReadStatusPacket(id);
   if (N>0)
@@ -448,9 +461,10 @@ void TBioloidController::LED (unsigned char id, unsigned int state)
 
 void TBioloidController::SetLightDetectCompare (unsigned char id, unsigned char value)
 {
+  LASSERT(serial_!=NULL);
   biol_writes_.Init(id);
   biol_writes_<<0x03<<0x35<<value;
-  biol_writes_>>serial_;
+  biol_writes_>>*serial_;
 
   int N= ReadStatusPacket(id);
   if (N>0)
@@ -462,9 +476,10 @@ void TBioloidController::SetLightDetectCompare (unsigned char id, unsigned char 
 
 bool TBioloidController::EnableTorque (unsigned char id)
 {
+  LASSERT(serial_!=NULL);
   biol_writes_.Init(id);
   biol_writes_<<0x03<<0x18<<1;
-  biol_writes_>>serial_;
+  biol_writes_>>*serial_;
 
   int N= ReadStatusPacket(id);
   if (N>0)
@@ -478,9 +493,10 @@ bool TBioloidController::EnableTorque (unsigned char id)
 
 int TBioloidController::GetAngle (unsigned char id, double &angle)
 {
+  LASSERT(serial_!=NULL);
   biol_writes_.Init(id);
   biol_writes_<<0x02<<0x24<<2;
-  biol_writes_>>serial_;
+  biol_writes_>>*serial_;
 
   int N= ReadStatusPacket(id);
   #if 0
@@ -491,13 +507,16 @@ int TBioloidController::GetAngle (unsigned char id, double &angle)
   std::cerr<<"GetAngle: err= "<<(double)ERR/(double)TOTAL*100.0<<"%"<<std::endl;
   #endif
   angle= CommandToDegree<double>(buffer_[5],buffer_[6]);
-#ifdef BIOLOID_SERIAL
-  if(serial_.GetStatus()!=TBioloidSerial::COMM_RXSUCCESS)  return 0;
-#endif
+
+  if(serial_type_==sctBioloid)
+  {
+    if(serial_bio_.GetStatus()!=TBioloidSerial::COMM_RXSUCCESS)  return 0;
 //*dbg*/if(angle>50) std::cerr<<"read "<<N<<" bytes: "<<PrintBuffer(buffer_,N)<<std::endl;
-//*dbg*/if(angle>50) LDBGVAR(serial_.GetStatus());
+//*dbg*/if(angle>50) LDBGVAR(serial_bio_.GetStatus());
 //*dbg*/if(angle>50) LDBGVAR(angle);
 //*dbg*/if(angle>50) exit(1);
+  }
+
   return N;
 }
 //-------------------------------------------------------------------------------------------
@@ -525,11 +544,12 @@ int TBioloidController::PersistingGetAngle (unsigned char id, double &angle, int
     \param [in]sensor_pos  : -1:left, 0:center, 1:right  */
 int TBioloidController::GetDistance (unsigned char id, int sensor_pos, double &distance)
 {
+  LASSERT(serial_!=NULL);
   if (sensor_pos<-1 || sensor_pos>1)
     {LERROR("in GetDistance: invalid sensor_pos: "<<sensor_pos);  return -1;}
   biol_writes_.Init(id);
   biol_writes_<<0x02<<(0x1B+sensor_pos)<<1;
-  biol_writes_>>serial_;
+  biol_writes_>>*serial_;
 
   int N= ReadStatusPacket(id);
   #if 0

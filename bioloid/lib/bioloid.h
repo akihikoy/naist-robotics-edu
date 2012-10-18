@@ -22,6 +22,42 @@ namespace bioloid
 {
 //-------------------------------------------------------------------------------------------
 
+//-------------------------------------------------------------------------------------------
+// global variables
+//-------------------------------------------------------------------------------------------
+const double DEGREE_MIN (0.0);
+const double DEGREE_MAX (300.0);
+const double RPM_MIN (0.0);
+const double RPM_MAX (114.0);
+const int    COMMAND_ANGLE_MAX (1023);
+const int    COMMAND_ANGVEL_MAX (1023);
+const double DEGREE_PER_COMMAND ((DEGREE_MAX-DEGREE_MIN)/static_cast<double>(COMMAND_ANGLE_MAX));
+const double RPM_PER_COMMAND ((RPM_MAX-RPM_MIN)/static_cast<double>(COMMAND_ANGVEL_MAX));
+const double COMMON_ANGLE_OFFSET (150.0);
+//-------------------------------------------------------------------------------------------
+const int    BUFFER_SIZE(2048);
+//-------------------------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------------------------
+// utilities
+//-------------------------------------------------------------------------------------------
+termios GetDefaultTermios (void);
+//-------------------------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------------------------
+// template utilities
+//-------------------------------------------------------------------------------------------
+template <typename t_value>
+inline int DegreeToCommand (const t_value &v_angle);
+template <typename t_value>
+inline int RPMToCommand (const t_value &v_rpm);
+template <typename t_value>
+inline t_value CommandToDegree (int command_lo, int command_hi);
+template <typename t_value>
+inline t_value CommandToRPM (int command_lo, int command_hi);
+//-------------------------------------------------------------------------------------------
+
+
 class TBioloidWriteStream : public serial::TSerialStreamBase
 {
 protected:
@@ -89,40 +125,6 @@ public:
 };
 //-------------------------------------------------------------------------------------------
 
-
-//-------------------------------------------------------------------------------------------
-const double DEGREE_MIN (0.0);
-const double DEGREE_MAX (300.0);
-const double RPM_MIN (0.0);
-const double RPM_MAX (114.0);
-const int    COMMAND_ANGLE_MAX (1023);
-const int    COMMAND_ANGVEL_MAX (1023);
-const double DEGREE_PER_COMMAND ((DEGREE_MAX-DEGREE_MIN)/static_cast<double>(COMMAND_ANGLE_MAX));
-const double RPM_PER_COMMAND ((RPM_MAX-RPM_MIN)/static_cast<double>(COMMAND_ANGVEL_MAX));
-const double COMMON_ANGLE_OFFSET (150.0);
-//-------------------------------------------------------------------------------------------
-const int    BUFFER_SIZE(2048);
-//-------------------------------------------------------------------------------------------
-
-//-------------------------------------------------------------------------------------------
-// utilities
-//-------------------------------------------------------------------------------------------
-termios GetDefaultTermios (void);
-//-------------------------------------------------------------------------------------------
-
-//-------------------------------------------------------------------------------------------
-// template utilities
-//-------------------------------------------------------------------------------------------
-template <typename t_value>
-inline int DegreeToCommand (const t_value &v_angle);
-template <typename t_value>
-inline int RPMToCommand (const t_value &v_rpm);
-template <typename t_value>
-inline t_value CommandToDegree (int command_lo, int command_hi);
-template <typename t_value>
-inline t_value CommandToRPM (int command_lo, int command_hi);
-//-------------------------------------------------------------------------------------------
-
 //===========================================================================================
 class TBioloidSerial : public serial::TSerialCom
 //===========================================================================================
@@ -167,11 +169,9 @@ protected:
   void setting(const std::string &_tty, const termios &_ios);
 
   int low_read(void *buff);
-
 };
 //-------------------------------------------------------------------------------------------
 
-#define BIOLOID_SERIAL
 
 //===========================================================================================
 class TBioloidController
@@ -179,11 +179,12 @@ class TBioloidController
 {
 public:
 
-  #ifndef BIOLOID_SERIAL
+  TBioloidController() : serial_type_(sctNone), serial_(NULL) {}
+
+  //! using TSerialCom for serial communication (CM-5,(CM-500))
   void Connect (const std::string &v_tty, const termios &v_ios=GetDefaultTermios());
-  #else
-  void Connect (const std::string &v_tty, int baudnum=1);
-  #endif
+  //! using TBioloidSerial for serial communication (USB2Dynamixel)
+  void ConnectBS (const std::string &v_tty, int baudnum=1);
   void Disconnect ();
 
   //!\brief read from where the data starts with 0xffff
@@ -224,11 +225,11 @@ public:
   int GetDistance (unsigned char id, int sensor_pos, double &distance);
 
 protected:
-  #ifndef BIOLOID_SERIAL
-  serial::TSerialCom  serial_;
-  #else
-  TBioloidSerial  serial_;
-  #endif
+
+  enum TSerialComType {sctNone=0, sctStandard, sctBioloid}  serial_type_;
+  serial::TSerialCom  serial_std_;
+  TBioloidSerial  serial_bio_;
+  serial::TSerialCom  *serial_;
 
   serial::TStringWriteStream   str_writes_;
   TBioloidWriteStream          biol_writes_;
@@ -242,6 +243,7 @@ protected:
 template <typename t_angle_fwditr, typename t_id_fwditr>
 void TBioloidController::GoTo (t_id_fwditr id_begin, t_id_fwditr id_end, t_angle_fwditr angle_begin)
 {
+  LASSERT(serial_!=NULL);
   sync_writes_.Init (0x1e, 2);
   int command, hi, lo;
   for (; id_begin!=id_end; ++id_begin,++angle_begin)
@@ -251,7 +253,7 @@ void TBioloidController::GoTo (t_id_fwditr id_begin, t_id_fwditr id_end, t_angle
     hi= (command-lo) / 256;
     sync_writes_<<*id_begin<<lo<<hi;
   }
-  sync_writes_>>serial_;
+  sync_writes_>>*serial_;
   // NOTE: no status packet
 }
 //-------------------------------------------------------------------------------------------
