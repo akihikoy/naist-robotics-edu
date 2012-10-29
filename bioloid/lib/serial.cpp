@@ -8,13 +8,12 @@
 //-------------------------------------------------------------------------------------------
 #include <serial.h>
 //-------------------------------------------------------------------------------------------
-#include<cerrno>
-#include<cstdio>
-#include<unistd.h>
-#include<fcntl.h>
-
+#include <cerrno>
+#include <cstdio>
 #include <iostream>
 #include <sstream>
+#include <unistd.h>
+#include <fcntl.h>
 #include <sys/ioctl.h>
 //-------------------------------------------------------------------------------------------
 namespace loco_rabbits

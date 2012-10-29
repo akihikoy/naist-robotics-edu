@@ -7,11 +7,13 @@
 */
 //-------------------------------------------------------------------------------------------
 #include <bioloid.h>
-#include <linux/serial.h>
+//-------------------------------------------------------------------------------------------
 #include <cstdio>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>  // gettimeofday
+#include <linux/serial.h>
 //-------------------------------------------------------------------------------------------
 namespace loco_rabbits
 {
