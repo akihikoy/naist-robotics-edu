@@ -12,8 +12,8 @@ core
 core.[0-9]*
 
 bin/config.sh
+naoconfig.py
 nao/sample/cpp/naoconfig.h
-nao/*/naoconfig.py
 nao/sample/py/setup.tcsh
 nao/sample/py/setup.bash
 
