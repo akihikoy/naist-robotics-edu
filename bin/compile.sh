@@ -24,7 +24,7 @@ while true; do
   case "$1" in
     -help|--help) echo "usage: $usage"; exit 0 ;;
     -eig) LIBS="$LIBS $LIBS_EIG"; shift 1 ;;
-    -sg)  LDLIBS="$LDLIBS $LDLIBS_SHOGUN"; shift 1 ;;
+    -sg)  LIBS="$LIBS $LIBS_SHOGUN"; LDLIBS="$LDLIBS $LDLIBS_SHOGUN"; shift 1 ;;
     -cv)  LIBS="$LIBS $LIBS_CV"; LDLIBS="$LDLIBS $LDLIBS_CV"; shift 1 ;;
     -ode) LIBS="$LIBS $LIBS_ODE"; LDLIBS="$LDLIBS $LDLIBS_ODE"; shift 1 ;;
     -nao) LIBS="$LIBS $LIBS_NAO"; LDLIBS="$LDLIBS $LDLIBS_NAO"; shift 1 ;;

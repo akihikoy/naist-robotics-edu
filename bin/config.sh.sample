@@ -5,6 +5,7 @@ CXXFLAGS+=" -Wstrict-aliasing=1"
 
 LIBS_EIG="-I/usr/include/eigen3"
 
+LIBS_SHOGUN=""
 LDLIBS_SHOGUN="-lshogun"
 
 LIBS_CV="`pkg-config opencv --cflags`"
