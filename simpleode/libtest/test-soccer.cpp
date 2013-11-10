@@ -141,6 +141,7 @@ void test_keyevent(xode::TEnvironment &env, xode::TDynRobot &robot, int command)
   else if(command=='s')  Target1[1]= robot.Body(idx).getPosition()[1] - d;
   else if(command=='a')  Target1[2]= get_theta(robot,idx) + d;
   else if(command=='d')  Target1[2]= get_theta(robot,idx) - d;
+  cerr<<"target: "<<Target1[0]<<" "<<Target1[1]<<" "<<Target1[2]<<endl;
 }
 
 int main (int argc, char **argv)
