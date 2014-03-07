@@ -7,7 +7,7 @@
 #include <sys/ioctl.h>
 #include <linux/joystick.h>
 
-#include "../sample/cpp/naoconfig.h"
+#include "naoconfig.h"
 #include <alproxies/almotionproxy.h>
 
 #include <cmath>

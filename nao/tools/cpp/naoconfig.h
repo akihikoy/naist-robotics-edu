@@ -1,0 +1,1 @@
+../../sample/cpp/naoconfig.h
